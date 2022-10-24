@@ -1,0 +1,2 @@
+include:
+  remote: 'https://gitlab.com/cipres/dpp/-/raw/master/.gitlab/templates/dwheel.yml'
