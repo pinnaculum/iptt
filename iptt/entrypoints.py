@@ -1,10 +1,10 @@
 import argparse
 import asyncio
 
-from iphttp import client
+from iptt.iphttp import client
 
 
-def run():
+def iphttp_run():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--kubo-maddr',

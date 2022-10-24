@@ -11,17 +11,17 @@ install_reqs = reqs_parse('requirements.txt')
 found_packages = find_packages(exclude=['tests', 'tests.*'])
 
 setup(
-    name='iphttp',
+    name='iptt',
     version='1.0.0',
     license='MIT',
     author='cipres',
-    url='https://gitlab.com/cipres/iphttp',
-    description='iphttp',
+    url='https://gitlab.com/galacteek/iptt/iptt',
+    description='iptt',
     packages=found_packages,
     install_requires=install_reqs,
     entry_points={
         'console_scripts': [
-            'iphttp = iphttp.entrypoints:run'
+            'iphttp = iptt.entrypoints:iphttp_run'
         ]
     },
     classifiers=[

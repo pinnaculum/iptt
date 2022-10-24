@@ -1,2 +1,6 @@
+variables:
+  WHEEL_NAME: iptt
+  VERSION: 1.0.0
+
 include:
   remote: 'https://gitlab.com/cipres/dpp/-/raw/master/.gitlab/templates/dwheel.yml'

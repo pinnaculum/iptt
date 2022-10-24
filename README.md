@@ -1,7 +1,11 @@
-Interplanetary HTTP toolkit
-===========================
+InterPlanetary Tunnel Toolkit
+=============================
 
-Provides tools to make HTTP requests over IPFS tunnels.
+Provides tools to make all kinds of requests over IPFS tunnels.
+
+```sh
+pip install .
+```
 
 iphttp
 ------
