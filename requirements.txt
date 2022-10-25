@@ -1,1 +1,6 @@
+async-timeout>=3.0.0
+attrs>=22.1.0
 aioipfs>=0.5.9
+aiologger>=0.7.0
+ptpython>=3.0.20
+uvloop>=0.17.0

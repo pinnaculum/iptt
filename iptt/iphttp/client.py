@@ -1,71 +1,110 @@
-import json
-import re
+import asyncio
+import attr
+import functools
 import sys
 import traceback
-from yarl import URL
+import os.path
 
 from aioipfs import AsyncIPFS
-from aioipfs.helpers import peerid_base36
+from iptt import peerid_valid
 
-from .request import request as iphttp_request
+from ptpython import embed
+
+from ..cli import configure as cli_configure
+from .interface import cli_get
+from .interface import cli_post
+from .request import iphttp_request_path
 
 
 async def iphttp_main(client: AsyncIPFS, args):
+    req_peerid: str = None
+    path: str = ''
+
     try:
         peer_id = (await client.core.id())['ID']
         assert peer_id
     except Exception:
-        print(f'Cannot connect to kubo node: {args.maddr}',
+        print(f'Cannot connect to the kubo RPC API: {args.maddr}',
               file=sys.stderr)
         sys.exit(1)
 
-    for url in args.urlparts:
-        try:
-            parts = url.strip().split('/')
-            peerid = parts[0]
+    for raw in args.params:
+        for param in raw.split('/'):
+            pclean = param.rstrip('/')
 
-            if len(parts) > 1:
-                path = '/' + parts[1]
+            if peerid_valid(pclean) and not path:
+                req_peerid = pclean
+                path = os.path.join(path, req_peerid)
             else:
-                path = '/'
-        except Exception as err:
-            print(err)
-            continue
+                path = os.path.join(path, param)
 
-        if re.search(r'[A-Z]+', peerid):
-            # base58 => base36
-            peerid = peerid_base36(peerid)
-            if not peerid:
-                print(f'Invalid peerid: {peerid}')
-                sys.exit(2)
+    try:
+        assert path
+        data, ctype = await iphttp_request_path(client, path)
+    except AssertionError:
+        sys.exit(2)
+    except Exception:
+        traceback.print_exc()
+        raise
 
-        url = URL.build(
-            host=peerid,
-            scheme='ipfs+http',
-            path=path
-        )
+    if not data:
+        print(f'Empty reply from: {peer_id}')
+        sys.exit(2)
 
-        try:
-            data, ctype = await iphttp_request(
-                client,
-                str(url)
-            )
-        except Exception:
-            traceback.print_exc()
-            sys.exit(1)
 
-        if not data:
-            print(f'Empty reply from: {peerid}')
-            sys.exit(2)
+params = {}
 
-        if ctype == 'application/json':
-            obj = json.loads(data.getvalue())
 
-            print(json.dumps(obj, indent=4))
-        else:
-            print(data.getvalue().decode())
+def wrap(coro, *args, **kw):
+    asyncio.ensure_future(coro(*args, **kw))
+
+
+@attr.s(auto_attribs=True)
+class Context:
+    # Current PeerId
+    peer_id_current: str = None
+
+    # Params
+    params: list = []
+
+    # Client
+    client: AsyncIPFS = None
 
 
 async def execute(args):
-    async with AsyncIPFS(maddr=args.maddr) as client:
-        await iphttp_main(client, args)
+    ctx = Context(params=args.params)
+
+    if args.interactive:
+        # Interactive mode
+        try:
+            if len(args.params) > 0 and peerid_valid(args.params[0]):
+                ctx.peer_id_current = args.params[0]
+
+            clocals = locals()
+            clocals.update({
+                'get': functools.partial(wrap, cli_get, ctx),
+                'post': functools.partial(wrap, cli_post, ctx)
+            })
+
+            params = args.params
+
+            async with AsyncIPFS(maddr=args.maddr) as client:
+                ctx.client = client
+
+                await embed(
+                    globals={},
+                    locals=clocals,
+                    return_asyncio_coroutine=True,
+                    patch_stdout=True,
+                    configure=cli_configure,
+                    history_filename=args.history_path
+                )
+        except EOFError:
+            pass
+        except Exception:
+            raise
+    else:
+        # Non-interactive mode
+
+        async with AsyncIPFS(maddr=args.maddr) as client:
+            await iphttp_main(client, args)

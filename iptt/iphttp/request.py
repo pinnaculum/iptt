@@ -1,4 +1,6 @@
 import asyncio
+import json
+import re
 import traceback
 
 from io import BytesIO
@@ -11,6 +13,9 @@ from yarl import URL
 
 from aioipfs import AsyncIPFS
 from aioipfs.helpers import peerid_base58
+from aioipfs.helpers import peerid_base36
+
+import async_timeout
 
 from . import IpfsHttpError
 from . import IpfsHttpServerError
@@ -21,12 +26,14 @@ except ImportError:
     pass
 
 
-async def request(client: AsyncIPFS,
-                  url: Union[str, URL],
-                  buffer: BytesIO = None,
-                  chunkSize: int = 65535,
-                  allowedMethods: list = ['GET', 'POST'],
-                  method='GET') -> tuple:
+async def iphttp_request(client: AsyncIPFS,
+                         url: Union[str, URL],
+                         buffer: BytesIO = None,
+                         data=None,
+                         params=None,
+                         chunkSize: int = 65535,
+                         allowedMethods: list = ['GET', 'POST'],
+                         method='GET') -> tuple:
     """
     Run a request
 
@@ -47,7 +54,7 @@ async def request(client: AsyncIPFS,
         raise IpfsHttpError(f'Unsupported http method: {method}')
 
     try:
-        # base36/base32 => cidv0 (base58) (cached conversion)
+        # base36/base32 => base58
         peerId = peerid_base58(hostb36)
         assert peerId is not None
     except Exception:
@@ -68,49 +75,107 @@ async def request(client: AsyncIPFS,
 
     try:
         # Tunnel
-        async with client.p2p.dial_endpoint(p2pEndpoint,
-                                            allow_loopback=True) as dial:
-            if dial.failed:
-                raise Exception(f'Dialing {peerId} failed')
 
-            url = dial.httpUrl(
-                rUrl.path,
-                query=rUrl.query,
-                fragment=rUrl.fragment
-            )
+        with async_timeout.timeout(60):
+            async with client.p2p.dial_endpoint(p2pEndpoint,
+                                                allow_loopback=True) as dial:
+                if dial.failed:
+                    raise Exception(f'Dialing {peerId} failed')
 
-            async with aiohttp.ClientSession() as sess:
-                async with sess.get(url) as resp:
-                    if resp.status != HTTPOk.status_code:
-                        raise IpfsHttpServerError(resp.status)
+                url = dial.httpUrl(
+                    rUrl.path,
+                    query=rUrl.query,
+                    fragment=rUrl.fragment
+                )
 
-                    ctyper = resp.headers.get('Content-Type',
-                                              'application/octet-stream')
+                async with aiohttp.ClientSession() as sess:
+                    async with sess.request(method,
+                                            url,
+                                            params=params,
+                                            data=data) as resp:
+                        if resp.status != HTTPOk.status_code:
+                            raise IpfsHttpServerError(resp.status)
 
-                    if isinstance(buffer, BytesIO):
-                        async for chunk in resp.content.iter_chunked(
-                                chunkSize):
-                            buffer.write(chunk)
+                        ctyper = resp.headers.get('Content-Type',
+                                                  'application/octet-stream')
 
-                            await asyncio.sleep(0)
-                    else:
-                        # Assume QIODevice (used from galacteek)
-                        buffer.open(QIODevice.WriteOnly)
+                        if isinstance(buffer, BytesIO):
+                            async for chunk in resp.content.iter_chunked(
+                                    chunkSize):
+                                buffer.write(chunk)
 
-                        async for chunk in resp.content.iter_chunked(
-                                chunkSize):
-                            buffer.write(chunk)
+                                await asyncio.sleep(0)
+                        else:
+                            # Assume QIODevice (used from galacteek)
+                            buffer.open(QIODevice.WriteOnly)
 
-                            await asyncio.sleep(0)
+                            async for chunk in resp.content.iter_chunked(
+                                    chunkSize):
+                                buffer.write(chunk)
 
-                        buffer.close()
+                                await asyncio.sleep(0)
 
-            ctype = ctyper.split(';')[0]
+                            buffer.close()
 
-            return buffer, ctype
+                ctype = ctyper.split(';')[0]
+
+                return buffer, ctype
     except ServerDisconnectedError as sderr:
         raise sderr
     except IpfsHttpServerError as herr:
         raise herr
     except Exception as err:
         raise err
+
+
+async def iphttp_request_path(client, path: str,
+                              data=None,
+                              params=None,
+                              method: str = 'GET'):
+    try:
+        parts = path.strip().split('/')
+        peerid = parts[0]
+
+        if len(parts) > 1:
+            path = '/' + parts[1]
+        else:
+            path = '/'
+    except Exception:
+        return None, None
+
+    if re.search(r'[A-Z]+', peerid):
+        # base58 => base36
+        peerid = peerid_base36(peerid)
+        if not peerid:
+            print(f'Invalid peerid: {peerid}')
+            return None, None
+
+    try:
+        assert peerid
+        content, ctype = await iphttp_request(
+            client,
+            URL.build(
+                host=peerid,
+                scheme='ipfs+http',
+                path=path
+            ),
+            method=method,
+            data=data,
+            params=params
+        )
+    except Exception:
+        traceback.print_exc()
+        return None, None
+
+    if not content:
+        print(f'Empty reply from: {peerid}')
+        return None, None
+
+    if ctype == 'application/json':
+        obj = json.loads(content.getvalue())
+
+        print(json.dumps(obj, indent=4))
+    else:
+        print(content.getvalue().decode())
+
+    return content, ctype
