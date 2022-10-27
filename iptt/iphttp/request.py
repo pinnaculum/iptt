@@ -16,30 +16,47 @@ from aioipfs.helpers import peerid_base58
 from aioipfs.helpers import peerid_base36
 
 import async_timeout
+import attr
 
 from . import IpfsHttpError
 from . import IpfsHttpServerError
 
 try:
+    # galacteek passes a QIODevice
     from PyQt5.QtCore import QIODevice
 except ImportError:
     pass
 
 
+@attr.s(auto_attribs=True)
+class IpHttpResponse:
+    data: BytesIO
+    content_type: str = None
+
+
+allowedMethods: list = ['GET',
+                        'POST',
+                        'DELETE',
+                        'PATCH']
+
+
 async def iphttp_request(client: AsyncIPFS,
                          url: Union[str, URL],
                          buffer: BytesIO = None,
-                         data=None,
-                         params=None,
+                         data: dict = {},
+                         params: dict = {},
+                         headers: dict = {},
                          chunkSize: int = 65535,
-                         allowedMethods: list = ['GET', 'POST'],
-                         method='GET') -> tuple:
+                         method='GET') -> IpHttpResponse:
     """
     Run a request
 
     :param str url: URL
     :param BytesIO buffer: Optional: buffer to write the response to
     :param str method: HTTP method (GET, POST)
+    :param dict data: POST data
+    :param dict params: query
+    :param dict headers: HTTP headers to pass
     :rtype: tuple (fd, mimetype)
     """
 
@@ -88,7 +105,7 @@ async def iphttp_request(client: AsyncIPFS,
                     fragment=rUrl.fragment
                 )
 
-                async with aiohttp.ClientSession() as sess:
+                async with aiohttp.ClientSession(headers=headers) as sess:
                     async with sess.request(method,
                                             url,
                                             params=params,
@@ -119,7 +136,10 @@ async def iphttp_request(client: AsyncIPFS,
 
                 ctype = ctyper.split(';')[0]
 
-                return buffer, ctype
+                return IpHttpResponse(
+                    data=buffer,
+                    content_type=ctype
+                )
     except ServerDisconnectedError as sderr:
         raise sderr
     except IpfsHttpServerError as herr:
@@ -129,8 +149,9 @@ async def iphttp_request(client: AsyncIPFS,
 
 
 async def iphttp_request_path(client, path: str,
-                              data=None,
-                              params=None,
+                              data: dict = {},
+                              params: dict = {},
+                              headers: dict = {},
                               method: str = 'GET'):
     try:
         parts = path.strip().split('/')
@@ -152,7 +173,7 @@ async def iphttp_request_path(client, path: str,
 
     try:
         assert peerid
-        content, ctype = await iphttp_request(
+        response = await iphttp_request(
             client,
             URL.build(
                 host=peerid,
@@ -161,21 +182,22 @@ async def iphttp_request_path(client, path: str,
             ),
             method=method,
             data=data,
-            params=params
+            params=params,
+            headers=headers
         )
     except Exception:
         traceback.print_exc()
-        return None, None
+        return None
 
-    if not content:
+    if not response.data:
         print(f'Empty reply from: {peerid}')
-        return None, None
+        return None
 
-    if ctype == 'application/json':
-        obj = json.loads(content.getvalue())
+    if response.content_type == 'application/json':
+        obj = json.loads(response.data.getvalue())
 
         print(json.dumps(obj, indent=4))
     else:
-        print(content.getvalue().decode())
+        print(response.data.getvalue().decode())
 
-    return content, ctype
+    return response

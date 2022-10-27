@@ -12,8 +12,11 @@ def parser_common():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--kubo-maddr',
+        '--maddr',
+        '-m',
         dest='maddr',
-        default='/ip4/127.0.0.1/tcp/5001'
+        default='/ip4/127.0.0.1/tcp/5001',
+        help="kubo node's RPC API multiaddr"
     )
     parser.add_argument(
         '-i',
@@ -32,7 +35,7 @@ def iphttp_run():
         '--history',
         action='store_true',
         default=False,
-        dest='Keep a history of the requests'
+        dest='Keep a history of the requests made in the interactive mode'
     )
     parser.add_argument(
         '--history-path',
@@ -43,7 +46,8 @@ def iphttp_run():
     )
     parser.add_argument(
         nargs='+',
-        dest='params'
+        dest='params',
+        help='iphttp request path. format: PeerId/path'
     )
 
     try:

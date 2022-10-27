@@ -40,19 +40,16 @@ async def iphttp_main(client: AsyncIPFS, args):
 
     try:
         assert path
-        data, ctype = await iphttp_request_path(client, path)
+        response = await iphttp_request_path(client, path)
     except AssertionError:
         sys.exit(2)
     except Exception:
         traceback.print_exc()
         raise
 
-    if not data:
+    if not response:
         print(f'Empty reply from: {peer_id}')
         sys.exit(2)
-
-
-params = {}
 
 
 def wrap(coro, *args, **kw):
@@ -85,8 +82,6 @@ async def execute(args):
                 'get': functools.partial(wrap, cli_get, ctx),
                 'post': functools.partial(wrap, cli_post, ctx)
             })
-
-            params = args.params
 
             async with AsyncIPFS(maddr=args.maddr) as client:
                 ctx.client = client
