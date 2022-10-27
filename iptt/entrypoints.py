@@ -24,6 +24,20 @@ def parser_common():
         action='store_true',
         default=False
     )
+    parser.add_argument(
+        '-s',
+        '--ssl',
+        dest='ssl',
+        action='store_true',
+        default=False,
+        help='Use SSL encryption'
+    )
+    parser.add_argument(
+        '--ca-cert',
+        dest='ca_cert',
+        default='ca.crt',
+        help='SSL Certificate authority'
+    )
 
     return parser
 
@@ -74,9 +88,31 @@ def iphttpd_run():
         default=80
     )
     parser.add_argument(
+        '--public-port-ssl',
+        dest='httpd_public_port_ssl',
+        help='The advertised HTTPs port',
+        default=443
+    )
+
+    parser.add_argument(
         '--serve-aiohttp',
         dest='serve_aiohttp_app',
-        help='Serve an aiohttp application from this module',
+        help='Serve an aiohttp application from a Python module',
+        default=None
+    )
+
+    parser.add_argument(
+        '--ssl-cert',
+        '--cert',
+        dest='ssl_cert',
+        help='SSL certificate path (PEM)',
+        default=None
+    )
+    parser.add_argument(
+        '--ssl-key',
+        '--key',
+        dest='ssl_key',
+        help='SSL key path',
         default=None
     )
 

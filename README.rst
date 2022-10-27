@@ -1,10 +1,14 @@
 InterPlanetary Tunnel Toolkit
 =============================
 
+.. image:: https://gitlab.com/galacteek/iptt/iptt/-/raw/master/media/img/iptt-256.png
+    :width: 128
+    :height: 128
+
 Provides tools to communicate with existing network protocols over
 IPFS tunnels (libp2p streams).
 
-- *iphttp*: Command-line iphttp client
+- *iphttp*: Command-line iphttp client (supports SSL)
 - *iphttpd*: iphttp server (can serve *aiohttp* apps or just forward to an
   existing HTTP service)
 
@@ -18,11 +22,14 @@ iphttp
 ======
 
 *iphttp* is the command-line client. To make a simple GET request,
-pass the PeerId with the HTTP path:
+pass the PeerId with the HTTP path. Use *--ssl* (or *-s*) to use
+SSL encryption:
 
 .. code-block:: bash
 
     iphttp QmQPeNsJPyVWPFDVHb77w8G42Fvo15z4bG2X8D2GhfbSXc/doc.txt
+
+    iphttp -s QmQPeNsJPyVWPFDVHb77w8G42Fvo15z4bG2X8D2GhfbSXc/doc.txt
 
 Use *--maddr* to pass the RPC API multiaddr_ of your kubo_ node (the
 default multiaddr is */ip4/127.0.0.1/tcp/5001*) :
@@ -69,7 +76,7 @@ Serve **http://localhost:7000** for the P2P protocol **/x/ipfs-http/80/1.0**
 
 .. code-block:: bash
 
-    iphttpd -l localhost:7080
+    iphttpd -l localhost:80:7080
 
 Example 2
 ---------
@@ -78,7 +85,7 @@ Serve **http://localhost:8080** for the P2P protocol **/x/ipfs-http/8000/1.0**
 
 .. code-block:: bash
 
-    iphttpd --public-port 8000 -l localhost:8080
+    iphttpd -l localhost:8000:8080
 
 Example 3
 ---------
@@ -93,6 +100,15 @@ Serve an aiohttp application from Python module
 Your module should implement the coroutine **create_app(args)** and return
 an *aiohttp.web.Application* instance that will be used to run the service
 (see the helloworld_ service).
+
+Example 4
+---------
+
+Serve an application with SSL on port 8200:
+
+.. code-block:: bash
+
+    iphttpd -s --serve-aiohttp iphttpd_apps.helloworld --cert iphttpd.io.pem --key iphttpd.io-key.pem -l localhost:443:8200
 
 Projects using iptt
 ===================

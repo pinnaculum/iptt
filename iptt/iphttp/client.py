@@ -4,6 +4,7 @@ import functools
 import sys
 import traceback
 import os.path
+import ssl
 
 from aioipfs import AsyncIPFS
 from iptt import peerid_valid
@@ -39,8 +40,17 @@ async def iphttp_main(client: AsyncIPFS, args):
                 path = os.path.join(path, param)
 
     try:
+        ssl_context = None
+        if args.ca_cert:
+            ssl_context = ssl.create_default_context(
+                purpose=ssl.Purpose.CLIENT_AUTH,
+                cafile=args.ca_cert
+            )
+
         assert path
-        response = await iphttp_request_path(client, path)
+        response = await iphttp_request_path(client, path,
+                                             ssl_context=ssl_context,
+                                             ssl=args.ssl)
     except AssertionError:
         sys.exit(2)
     except Exception:

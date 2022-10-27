@@ -7,7 +7,9 @@ from io import BytesIO
 from typing import Union
 
 import aiohttp
+from aiohttp.client_exceptions import ClientConnectorError
 from aiohttp.client_exceptions import ServerDisconnectedError
+from aiohttp.client_exceptions import ClientConnectorCertificateError
 from aiohttp.web_exceptions import HTTPOk
 from yarl import URL
 
@@ -50,6 +52,7 @@ async def iphttp_request(client: AsyncIPFS,
                          params: dict = {},
                          headers: dict = {},
                          chunkSize: int = 65535,
+                         ssl_context=None,
                          method='GET') -> IpHttpResponse:
     """
     Run an iphttp request
@@ -112,14 +115,16 @@ async def iphttp_request(client: AsyncIPFS,
                 url = dial.httpUrl(
                     rUrl.path,
                     query=rUrl.query,
-                    fragment=rUrl.fragment
+                    fragment=rUrl.fragment,
+                    scheme='https' if rUrl.scheme == 'ipfs+https' else 'http'
                 )
 
                 async with aiohttp.ClientSession(headers=headers) as sess:
                     async with sess.request(method,
                                             url,
                                             params=params,
-                                            data=data) as resp:
+                                            data=data,
+                                            ssl=ssl_context) as resp:
                         if resp.status != HTTPOk.status_code:
                             raise IpfsHttpServerError(resp.status)
 
@@ -150,19 +155,26 @@ async def iphttp_request(client: AsyncIPFS,
                     data=buffer,
                     content_type=ctype
                 )
+    except ClientConnectorError as ccerr:
+        raise ccerr
     except ServerDisconnectedError as sderr:
         raise sderr
+    except ClientConnectorCertificateError as cert_error:
+        raise cert_error
     except IpfsHttpServerError as herr:
         raise herr
     except Exception as err:
         raise err
 
 
-async def iphttp_request_path(client, path: str,
+async def iphttp_request_path(client: AsyncIPFS,
+                              path: str,
                               data: dict = {},
                               params: dict = {},
                               headers: dict = {},
-                              method: str = 'GET'):
+                              method: str = 'GET',
+                              ssl_context=None,
+                              ssl=False):
     try:
         parts = path.strip().split('/')
         peerid = parts[0]
@@ -187,13 +199,14 @@ async def iphttp_request_path(client, path: str,
             client,
             URL.build(
                 host=peerid,
-                scheme='ipfs+http',
+                scheme='ipfs+https' if ssl else 'ipfs+http',
                 path=path
             ),
             method=method,
             data=data,
             params=params,
-            headers=headers
+            headers=headers,
+            ssl_context=ssl_context
         )
     except Exception:
         traceback.print_exc()

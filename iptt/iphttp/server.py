@@ -2,6 +2,8 @@ import asyncio
 import ipaddress
 import traceback
 import importlib
+import re
+import ssl
 
 from aiologger import Logger
 
@@ -18,8 +20,18 @@ log = Logger.with_default_handlers(name='iphttpd')
 async def serve_app(args,
                     host: str,
                     port: str,
+                    public_port: str,
                     appmod: str):
+    ssl_context = None
     try:
+        if args.ssl and args.ssl_cert and args.ssl_key:
+            ssl_context = ssl.create_default_context(
+                cafile=args.ca_cert,
+                purpose=ssl.Purpose.CLIENT_AUTH
+            )
+
+            ssl_context.load_cert_chain(args.ssl_cert, args.ssl_key)
+
         mod = importlib.import_module(appmod)
 
         app = await mod.create_app(args)
@@ -27,7 +39,11 @@ async def serve_app(args,
 
         await runner.setup()
 
-        site = web.TCPSite(runner, host, port)
+        if args.ssl and ssl_context:
+            site = web.TCPSite(runner, host, port, ssl_context=ssl_context)
+        else:
+            site = web.TCPSite(runner, host, port)
+
         await site.start()
 
         if args.interactive:
@@ -35,6 +51,8 @@ async def serve_app(args,
         else:
             while True:
                 await asyncio.sleep(5)
+    except ssl.SSLError:
+        raise
     except KeyboardInterrupt:
         raise
     except asyncio.CancelledError:
@@ -49,18 +67,31 @@ async def serve_app(args,
 
 async def iphttpd(client: AsyncIPFS, args):
     alistening = False
-    proto = f'/x/ipfs-http/{args.httpd_public_port}/1.0'
 
     try:
-        host, port = args.httpd_listen_addr.split(':')
+        match = re.search(r'^\s*([\w\.]+):(\d+):(\d+)',
+                          args.httpd_listen_addr)
+        assert match is not None
+
+        host = match.group(1)
+        public_port = match.group(2)
+        port = match.group(3)
+
         assert host
         assert port
+        assert public_port
+
         addr = ipaddress.ip_address(host)
         maddr = f'/ip{addr.version}/{host}/tcp/{port}'
     except AssertionError:
         raise
     except ValueError:
         maddr = f'/dns4/{host}/tcp/{port}'
+
+    if args.ssl:
+        proto = f'/x/ipfs-https/{public_port}/1.0'
+    else:
+        proto = f'/x/ipfs-http/{public_port}/1.0'
 
     try:
         for listener in await client.p2p.listeners():
@@ -87,7 +118,7 @@ async def iphttpd(client: AsyncIPFS, args):
         appmod = args.serve_aiohttp_app
         if appmod is not None:
             try:
-                await serve_app(args, host, port, appmod)
+                await serve_app(args, host, port, public_port, appmod)
             except Exception:
                 raise
 
