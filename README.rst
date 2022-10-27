@@ -12,6 +12,8 @@ IPFS tunnels (libp2p streams).
 
     pip install -U iptt
 
+Checkout the documentation `here <https://iptt.readthedocs.io/en/latest>`_.
+
 iphttp
 ======
 
@@ -92,12 +94,17 @@ Your module should implement the coroutine **create_app(args)** and return
 an *aiohttp.web.Application* instance that will be used to run the service
 (see the helloworld_ service).
 
+Projects using iptt
+===================
+
+- galacteek_
+
 License
 =======
 
 **God bless HTTP, and God bless IPFS** license.
 
-
+.. _galacteek: https://gitlab.com/galacteek/galacteek
 .. _helloworld: https://gitlab.com/galacteek/iptt/iptt/-/blob/master/iphttpd_apps/helloworld.py
 .. _kubo: https://github.com/ipfs/kubo
 .. _multiaddr: https://multiformats.io/multiaddr

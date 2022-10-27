@@ -30,7 +30,10 @@ except ImportError:
 
 @attr.s(auto_attribs=True)
 class IpHttpResponse:
+    # Content of the response
     data: BytesIO
+
+    # Content-type (MIME)
     content_type: str = None
 
 
@@ -49,15 +52,22 @@ async def iphttp_request(client: AsyncIPFS,
                          chunkSize: int = 65535,
                          method='GET') -> IpHttpResponse:
     """
-    Run a request
+    Run an iphttp request
 
-    :param str url: URL
+    The URL should be in the following format:
+
+    ipfs+http://{peerid-base36}/path
+
+    ipfs+https://{peerid-base36}/path
+
+    :param AsyncIPFS client: IPFS node client to run the request with
+    :param str url: URL in the format: ipfs+http(s)://{peerid-base36}/path
     :param BytesIO buffer: Optional: buffer to write the response to
     :param str method: HTTP method (GET, POST)
     :param dict data: POST data
-    :param dict params: query
+    :param dict params: HTTP query dictionary
     :param dict headers: HTTP headers to pass
-    :rtype: tuple (fd, mimetype)
+    :rtype: IpHttpResponse
     """
 
     rUrl = url if isinstance(url, URL) else URL(url)

@@ -9,9 +9,11 @@ Welcome to iptt's documentation!
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
+   :name: mastertoc
+
+   api
 
 .. include:: ../README.rst
-
 
 Indices and tables
 ==================
