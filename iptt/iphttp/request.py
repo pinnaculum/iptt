@@ -45,15 +45,15 @@ allowedMethods: list = ['GET',
                         'PATCH']
 
 
-async def iphttp_request(client: AsyncIPFS,
-                         url: Union[str, URL],
-                         buffer: BytesIO = None,
-                         data: dict = {},
-                         params: dict = {},
-                         headers: dict = {},
-                         chunkSize: int = 65535,
-                         ssl_context=None,
-                         method='GET') -> IpHttpResponse:
+async def iphttp_request_url(client: AsyncIPFS,
+                             url: Union[str, URL],
+                             buffer: BytesIO = None,
+                             data: dict = {},
+                             params: dict = {},
+                             headers: dict = {},
+                             chunkSize: int = 65535,
+                             ssl_context=None,
+                             method='GET') -> IpHttpResponse:
     """
     Run an iphttp request
 
@@ -195,7 +195,7 @@ async def iphttp_request_path(client: AsyncIPFS,
 
     try:
         assert peerid
-        response = await iphttp_request(
+        response = await iphttp_request_url(
             client,
             URL.build(
                 host=peerid,
